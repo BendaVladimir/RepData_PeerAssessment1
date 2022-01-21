@@ -8,18 +8,101 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r echo = TRUE}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(lubridate)
 
+setwd('/home/shinobi/Documents')
+
+activity_data <- read_csv("activity.csv")
+
+
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r echo = TRUE}
+
+activity_data_day <-activity_data %>%
+  group_by(date) %>%
+  summarize(steps_date = sum(steps))
+
+hist(activity_data_day$steps_date, xlab = "Steps", ylab = "Number of days",main = "Histogram steps by day")
+
+activity_data_summary <- activity_data %>%
+  group_by(date) %>%
+  summarise(mean_steps = mean(steps, na.rm = TRUE),
+            median_steps = median(steps, na.rm = TRUE))
+
+activity_data_summary
+
+```
 
 
 ## What is the average daily activity pattern?
 
+```{r echo = TRUE}
+
+with(activity_data_summary, plot(date, mean_steps, type = "l"))
+
+max_interval <- activity_data %>%
+  group_by(interval) %>%
+  summarise(mean_interval = mean(steps, na.rm = TRUE)) %>%
+  filter(mean_interval == max(mean_interval)) %>%
+  select(interval)
+
+print(paste("Interval with maximum mean steps is ", as.character(max_interval)))
+
+```
 
 
 ## Imputing missing values
 
+In order to clean values in activity dataset, imputer strategy that was selected is median imputation grouped by date. In order to clean all null values dplyr?s mutate functionality was used. Due to the fact that some days had only null values double check for null values had to be used.
+
+```{r echo = TRUE}
+
+missing_values <- activity_data %>%
+  summarize(total_number = n(),
+            missing_number = sum(is.na(steps)))
+
+print(paste("Total number of records in dataset is ",missing_values$total_number, " and missing numer is ", missing_values$missing_number, " which is ", round(missing_values$missing_number / missing_values$total_number * 100,2), "% of total records."))
+
+
+activity_data_imputed <- activity_data %>%
+  #group_by(date) %>%
+  mutate(steps = ifelse(is.na(steps), 
+                        ifelse(is.na(median(steps, na.rm = TRUE)), 0, median(steps, na.rm = TRUE)), 
+                        steps))
+
+hist(activity_data_imputed$steps, xlab = "Steps", ylab = "Number of days",main = "Histogram steps by day on imputed values")
+
+
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r echo = TRUE}
+
+activity_data_imputed_weekday <- activity_data_imputed %>%
+  mutate(weekday = as.factor(ifelse(wday(date) %in% c(1,6), "weekends", "weekdays")))
+
+weekend <- activity_data_imputed_weekday %>%
+  filter(weekday == "weekends") %>%
+  group_by(interval) %>%
+  summarize(mean_steps = mean(steps))
+
+weekday <- activity_data_imputed_weekday %>%
+  filter(weekday == "weekdays") %>%
+  group_by(interval) %>%
+  summarize(mean_steps = mean(steps))
+
+par(mfrow = c(2,1))
+with(weekday, plot(interval, mean_steps, type = "l", main = "weekday", ylab = "Number of steps", col= "blue"))
+with(weekend, plot(interval, mean_steps, type = "l", main = "weekend", ylab = "Number of steps", col= "blue"))
+```
